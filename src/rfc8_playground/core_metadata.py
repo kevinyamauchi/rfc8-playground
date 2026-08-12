@@ -264,9 +264,9 @@ def load_ome(container: dict[str, Any]) -> Node:
 
     For a standalone JSON document that object is the root of the file.
     For an OME-Zarr group or array it is the ``attributes`` object of the
-    ``zarr.json``, so the Zarr metadata around it is never seen here.
+    ``zarr.json``.
 
-    Metadata stored alongside the ome key is dropped with a warning.
+    Metadata not matching the spec is dropped with a warning.
 
     Parameters
     ----------
@@ -287,7 +287,7 @@ def load_ome(container: dict[str, Any]) -> Node:
 
 
 def dump_ome(node: Node) -> dict[str, Any]:
-    """Convert a root node to the object that holds the ome key.
+    """Make a JSON dictionary with metadata in the ome key.
 
     Parameters
     ----------
@@ -343,11 +343,9 @@ def write_document(
     With ``container="json"`` the file is written as a standalone JSON
     document, creating or overwriting it.
 
-    With ``container="zarr"`` the file must be an existing ``zarr.json``,
-    whose ``attributes.ome`` key is replaced. The rest of the file, including
-    the Zarr metadata and any other attributes, is left as it was. Zarr
-    containers are not created here because doing so would mean inventing
-    Zarr metadata, such as the shape and data type of an array.
+    With ``container="zarr"`` the file must be an existing ``zarr.json``.
+    The ``attributes.ome`` key is replaced. The rest of the file, including
+    the Zarr metadata and any other attributes, is left as is.
 
     Parameters
     ----------
