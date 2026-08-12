@@ -22,7 +22,7 @@ class Path:
         The RFC defines ``"zarr"`` and ``"json"``. Extensions may add
         prefixed types, e.g. ``"myorg:s3"``.
     path : str
-        The path itself. May be relative (``./image.ome.zarr``), an
+        The path itself. May be relative (``./image.some.zarr``), an
         absolute file URL, or an HTTP(S) URL.
     """
 
@@ -41,7 +41,7 @@ class Node:
     ----------
     version : str or None
         The version of the specification.
-        Only a Node used as the root object of the ``ome`` key has a version.
+        Only a Node used as the root object of the ``some`` key has a version.
         Non-root Nodes SHOULD NOT have one, which is not enforced here.
     type : str
         The type of the node.
@@ -69,7 +69,7 @@ class Node:
 
 @dataclass(kw_only=True)
 class Singlescale(Node):
-    """One resolution level of an OME-Zarr multiscale image.
+    """One resolution level of an SOME-Zarr multiscale image.
 
     Attributes
     ----------
@@ -98,7 +98,7 @@ class Singlescale(Node):
 
 @dataclass(kw_only=True)
 class Multiscale(Node):
-    """An OME-Zarr multiscale image.
+    """An SOME-Zarr multiscale image.
 
     The RFC requires exactly one of ``nodes`` or ``path``, but does not
     require it here. See the module docstring.
@@ -252,19 +252,19 @@ def dump_node(node: Node) -> dict[str, Any]:
     return data
 
 
-def load_ome(container: dict[str, Any]) -> Node:
-    """Build the root node from the object that holds the ``ome`` key.
+def load_some(container: dict[str, Any]) -> Node:
+    """Build the root node from the object that holds the ``some`` key.
 
     For a standalone JSON document that object is the root of the file.
-    For an OME-Zarr group or array it is the ``attributes`` object of the
+    For an SOME-Zarr group or array it is the ``attributes`` object of the
     ``zarr.json``, so the Zarr metadata around it is never seen here.
 
-    Metadata stored alongside the ``ome`` key is dropped with a warning.
+    Metadata stored alongside the ``some`` key is dropped with a warning.
 
     Parameters
     ----------
     container : dict
-        The object holding the ``ome`` key.
+        The object holding the ``some`` key.
 
     Returns
     -------
@@ -272,15 +272,15 @@ def load_ome(container: dict[str, Any]) -> Node:
         The root node.
     """
     try:
-        ome = container["ome"]
+        some = container["some"]
     except KeyError:
-        raise ValueError("metadata is missing the required 'ome' key")
+        raise ValueError("metadata is missing the required 'some' key")
 
-    return load_node(ome)
+    return load_node(some)
 
 
-def dump_ome(node: Node) -> dict[str, Any]:
-    """Convert a root node to the object that holds the ``ome`` key.
+def dump_some(node: Node) -> dict[str, Any]:
+    """Convert a root node to the object that holds the ``some`` key.
 
     Parameters
     ----------
@@ -290,15 +290,15 @@ def dump_ome(node: Node) -> dict[str, Any]:
     Returns
     -------
     dict[str, Any]
-        An object with a single ``ome`` key.
+        An object with a single ``some`` key.
     """
-    return {"ome": dump_node(node)}
+    return {"some": dump_node(node)}
 
 
-def _ome_container(data: dict[str, Any]) -> dict[str, Any]:
-    """Find the object holding the ``ome`` key in a parsed JSON file."""
+def _some_container(data: dict[str, Any]) -> dict[str, Any]:
+    """Find the object holding the ``some`` key in a parsed JSON file."""
     attributes = data.get("attributes")
-    if isinstance(attributes, dict) and "ome" in attributes:
+    if isinstance(attributes, dict) and "some" in attributes:
         return attributes
     return data
 
@@ -307,7 +307,7 @@ def read_document(path: str | os.PathLike[str]) -> Node:
     """Read the root node from a JSON file.
 
     Both storage layouts are accepted: a standalone JSON file, where the
-    ``ome`` key is at the root, and a ``zarr.json``, where it is under
+    ``some`` key is at the root, and a ``zarr.json``, where it is under
     ``attributes``.
 
     Parameters
@@ -323,7 +323,7 @@ def read_document(path: str | os.PathLike[str]) -> Node:
     with open(path) as f:
         data = json.load(f)
 
-    return load_ome(_ome_container(data))
+    return load_some(_some_container(data))
 
 
 def write_document(
@@ -337,7 +337,7 @@ def write_document(
     document, creating or overwriting it.
 
     With ``container="zarr"`` the file must be an existing ``zarr.json``,
-    whose ``attributes.ome`` key is replaced. The rest of the file, including
+    whose ``attributes.some`` key is replaced. The rest of the file, including
     the Zarr metadata and any other attributes, is left as it was. Zarr
     containers are not created here because doing so would mean inventing
     Zarr metadata, such as the shape and data type of an array.
@@ -358,12 +358,12 @@ def write_document(
         If ``container="zarr"`` and the file does not exist.
     """
     if container == "json":
-        data = dump_ome(node)
+        data = dump_some(node)
     elif container == "zarr":
         with open(path) as f:
             data = json.load(f)
 
-        data.setdefault("attributes", {})["ome"] = dump_node(node)
+        data.setdefault("attributes", {})["some"] = dump_node(node)
     else:
         raise ValueError(f"container must be 'json' or 'zarr', got {container!r}")
 

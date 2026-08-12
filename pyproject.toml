@@ -28,3 +28,8 @@ rfc8-playground = { path = ".", editable = true }
 
 [tool.pixi.dependencies]
 openjdk = ">=25.0.2,<26"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.2",
+]

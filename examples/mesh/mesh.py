@@ -1,10 +1,9 @@
 """This script demonstrates a collections dataset with an image, label, and mesh."""
 
-from skimage.measure import marching_cubes
 import napari
 import numpy as np
 from skimage.draw import ellipsoid
-from skimage.measure import label
+from skimage.measure import label, marching_cubes
 
 # Generate a level set about zero of two identical ellipsoids in 3D
 ellip_base = ellipsoid(6, 10, 16, levelset=True)
@@ -35,4 +34,3 @@ viewer.add_labels(segmentation)
 viewer.add_surface((all_vertices, all_faces))
 
 napari.run()
-
