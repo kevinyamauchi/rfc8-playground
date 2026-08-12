@@ -29,6 +29,10 @@ rfc8-playground = { path = ".", editable = true }
 [tool.pixi.dependencies]
 openjdk = ">=25.0.2,<26"
 
+[tool.typos.default.extend-words]
+# "ome" is a word here (OME-Zarr, the "ome" metadata key), not a typo of "some".
+ome = "ome"
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.2",
