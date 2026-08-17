@@ -9,10 +9,10 @@ This is an example to explore how the bioformats2raw HCS convention can be expre
 In the current OME-NGFF spec (0.6rc0), [bioformats2raw](https://ngff.openmicroscopy.org/specifications/dev/index.html#bioformats2raw-layout-metadata-transitional) is defined as [“transitional” metadata](https://ngff.openmicroscopy.org/specifications/dev/index.html#bioformats2raw-layout-metadata-transitional). That is, it was metadata introduced with the intention of removing it as the OME-NGFF specification matured.
 
 There were two main metadata attributes introduced to support bioformats2raw:
-- **`bioformats2raw.layout`**: this attribute defines the version of the layout being used in the dataset.
-- **`series`**: this attribute defines the order of the images and has to match the OME-XML (if provided). It’s not totally clear to me how this is used (see Open Questions below.). It is an ordered list of the paths to each image in the dataset. The paths are stored as strings. There are limited details in the spec on how the path should be formatted.
+- **`bioformats2raw.layout`**: this attribute defines the version of the layout being used in the dataset. It is stored in the top-level `zarr.json`.
+- **`series`**: this attribute defines the order of the images and has to match the OME-XML (if provided). It’s not totally clear to me how this is used (see Open Questions below.). It is an ordered list of the paths to each image in the dataset. The paths are stored as strings. There are limited details in the spec on how the path should be formatted. It is stored in the `OME` group's `zarr.json`, **not** at the top level.
 
-Both of these attributes are stored in the top-level zarr.json under the `ome` key:
+Both are stored under the `ome` key, but in different documents. The top-level `zarr.json`:
 ```json
 {
   "zarr_format": 3,
@@ -21,13 +21,25 @@ Both of these attributes are stored in the top-level zarr.json under the `ome` k
     "ome": {
       "version": "0.6rc0",
       "bioformats2raw.layout": 3
-      "series": ["0", "1"]
     }
   }
 }
 ```
 
-There is also an OME group defined to link OME-XML metadata to the OME-Zarr images. [OME-XML](https://ome-model.readthedocs.io/en/stable/ome-xml/index.html) is a format for storing the OME Data Model. The OME Data Model expresses acquisition and experimental metadata. The OME group is a zarr group named `OME` that contains an OME-XML-formatted metadata file named `METADATA.ome.xml` whose path should be `OME/METADATA.ome.xml` from the `zarr.json`.
+There is also an OME group defined to link OME-XML metadata to the OME-Zarr images. [OME-XML](https://ome-model.readthedocs.io/en/stable/ome-xml/index.html) is a format for storing the OME Data Model. The OME Data Model expresses acquisition and experimental metadata. The OME group is a zarr group named `OME` that contains an OME-XML-formatted metadata file named `METADATA.ome.xml` whose path should be `OME/METADATA.ome.xml` from the top-level `zarr.json`. The `series` attribute lives in that group's own `zarr.json`, alongside the OME-XML file it is ordered against:
+
+```json
+{
+  "zarr_format": 3,
+  "node_type": "group",
+  "attributes": {
+    "ome": {
+      "version": "0.6rc0",
+      "series": ["0", "1"]
+    }
+  }
+}
+```
 
 
 ### omero metadata in 0.6rc0
@@ -46,8 +58,9 @@ I propose that we can express the bioformats2raw metadata as RFC-8 extensions. T
 | Item | Where in bf2raw output | RFC-8 / extension representation | Rationale |
 | --- | --- | --- | --- |
 | `bioformats2raw.layout: 3` | root `zarr.json` | root collection `attributes["bf2raw:layout"]: 3` | This specifies the layout format being used. It follows the same convention as in v0.6rc0, but expressed as an attribute extension. |
-| `series` array | `/OME/zarr.json` or  root `zarr.json` | `ome:series` on the `ome:omeGroup` node or the root `zarr.json` | This is the same mechanism used in 0.6RC0 to map images arrays to OME-XML entries expressed as an RFC-8 attribute extension. In 0.6rc0 this was in the root `zarr.json`. It might make sense to include it in the OME group `zarr.json` so it is together with the OME-XML file.  |
+| `series` array | `/OME/zarr.json` | `ome:series` on the `ome:omeGroup` node, i.e. `OME/zarr.json` | This is the same mechanism used in 0.6rc0 to map image arrays to OME-XML entries, expressed as an RFC-8 attribute extension. It stays in the OME group's `zarr.json`, which is both where 0.6rc0 puts it and beside the OME-XML file it is ordered against. Note the paths are relative to the containing document — see open question 3. |
 | `OME` group | `/OME/zarr.json` | An `ome:omeGroup` node, listed in the plate collection's `nodes` | Creating an OME-XML node type allows readers to know where to find the OME-XML and how to open it. 0.6rc0 already utilized a Zarr group to define an OME node. |
+| `omero` metadata | image `zarr.json`, e.g. `A/1/0/zarr.json` | `omero:omero` on the `multiscale` node | The OMERO rendering metadata is written by the bioformats2raw converter. |
 
 We additionally use the HCS metadata in RFC-8 as is described in the table below. Note the [RFC-8 HCS metadata section](https://ngff.openmicroscopy.org/rfc/8/index.html#high-content-screening-hcs-metadata) departs from the MAY, SHOULD, MUST language and uses "Required Yes/No". That is reflected in the table below.
 
@@ -64,7 +77,7 @@ We additionally use the HCS metadata in RFC-8 as is described in the table below
 | `well` | Y | well collection, e.g., `A/1/zarr.json` | Fields are all different than in  0.6rc0|
 | `well.row` | Y | well collection, e.g., `A/1/zarr.json` | Reference to a `Row` in `plate.rows[].id` |
 | `well.column` | Y | well collection, e.g., `A/1/zarr.json` | Reference to a `Column` in `plate.columns[].id` |
-| `acquisition` | Y | each `multiscale` node in a well | Reference to an acquisition id in `well.images[].acquisition` |
+| `acquisition` | N | each `multiscale` node in a well | Reference to an `Acquisition` in `plate.acquisitions[].id`. In 0.6rc0 the equivalent is the integer in `well.images[].acquisition`. |
 
 
 #### Fields missing in RFC-8
@@ -74,13 +87,13 @@ There are a few fields specified in 0.6rc0 that are not explicitly defined in RF
 | v0.6rc0 field | Level | Key |
 | --- | --- | --- |
 | [`plate.field_count`](../../../docs/ngff_06rc0.md:1630) | SHOULD | `missingPlate:field_count` |
-| [`plate.acquisitions[].maximumfieldcount`](../../../docs/ngff_06rc0.md:1611) | SHOULD | `missingPlateAcquisitions:maximumfieldcount` |
-| [`plate.acquisitions[].description`](../../../docs/ngff_06rc0.md:1613) | MAY | `missingPlateAcquisitions:description` |
-| [`plate.acquisitions[].starttime`](../../../docs/ngff_06rc0.md:1615) | MAY | `missingPlateAcquisitions:starttime` |
-| [`plate.acquisitions[].endtime`](../../../docs/ngff_06rc0.md:1615) | MAY | `missingPlateAcquisitions:endtime` |
-| [`multiscales.type`](../../../docs/ngff_06rc0.md:1398) | SHOULD | `missingMultiscales:type` |
-| [`multiscales.metadata`](../../../docs/ngff_06rc0.md:1402) | SHOULD | `missingMultiscales:metadata` |
-| [`image-label.properties[]`](../../../docs/ngff_06rc0.md:1527) arbitrary keys | MAY | `missingImageLabel:properties` |
+| [`plate.acquisitions[].maximumfieldcount`](https://ngff.openmicroscopy.org/specifications/dev/index.html#plate-metadata) | SHOULD | `missingPlateAcquisitions:maximumfieldcount` |
+| [`plate.acquisitions[].description`](https://ngff.openmicroscopy.org/specifications/dev/index.html#plate-metadata) | MAY | `missingPlateAcquisitions:description` |
+| [`plate.acquisitions[].starttime`](https://ngff.openmicroscopy.org/specifications/dev/index.html#plate-metadata) | MAY | `missingPlateAcquisitions:starttime` |
+| [`plate.acquisitions[].endtime`](https://ngff.openmicroscopy.org/specifications/dev/index.html#plate-metadata) | MAY | `missingPlateAcquisitions:endtime` |
+| [`multiscales.type`](https://ngff.openmicroscopy.org/specifications/dev/index.html#multiscales-metadata) | SHOULD | `missingMultiscales:type` |
+| [`multiscales.metadata`](https://ngff.openmicroscopy.org/specifications/dev/index.html#multiscales-metadata) | SHOULD | `missingMultiscales:metadata` |
+| [`image-label.properties[]`](https://ngff.openmicroscopy.org/specifications/dev/index.html#labels-metadata) arbitrary keys | MAY | `missingImageLabel:properties` |
 
 ## Open questions
 1. What is the `bioformats2raw.layout` metadata for and [why must it have the value 3](https://ngff.openmicroscopy.org/specifications/dev/index.html#details)? 
@@ -99,11 +112,11 @@ There are a few fields specified in 0.6rc0 that are not explicitly defined in RF
 ### Install bioformats2raw
 
 1. Get bioformats2raw v0.12.1 from https://github.com/glencoesoftware/bioformats2raw/releases/tag/v0.12.1.
-2. Unzip into `rfc8-playground/examples/bf2raw_hcs`
+2. Unzip into `rfc8-playground/examples/bf_hcs`
 3. bioformats2raw requires a Java runtime. I used Pixi to locally install and use `openjdk` (see pyproject.toml). If you prefer a different Java runtime, install that one instead.
 ### Get the sample data
 
-We are using the “Single file OME-tiff” dataset from the [OME-tiff Plate sample data](https://ome-model.readthedocs.io/en/stable/ome-tiff/data.html#plate) (licensed CC-BY-NC-SA 3.0). Download the data (`NIRHTa+001.ome.tiff`) and move it into the `examples/bf2raw_hcs` directory. See the note below from the ome-model docs about a similar file that is invalid. Make sure you have the right one!
+We are using the “Single file OME-tiff” dataset from the [OME-tiff Plate sample data](https://ome-model.readthedocs.io/en/stable/ome-tiff/data.html#plate) (licensed CC-BY-NC-SA 3.0). Download the data (`NIRHTa+001.ome.tiff`) and move it into the `examples/bf_hcs` directory. See the note below from the ome-model docs about a similar file that is invalid. Make sure you have the right one!
 
 > Note:
 > An OME-TIFF file representative of the same plate had been previously generated and made available under NIRHTa-001.ome.tiff. Although the file is syntactically valid, the plate layout is incorrect due to a conversion issue. This file should be considered as deprecated and superseded by the two representative plate examples described above.
