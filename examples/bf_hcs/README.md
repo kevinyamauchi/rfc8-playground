@@ -95,6 +95,210 @@ There are a few fields specified in 0.6rc0 that are not explicitly defined in RF
 | [`multiscales.metadata`](https://ngff.openmicroscopy.org/specifications/dev/index.html#multiscales-metadata) | SHOULD | `missingMultiscales:metadata` |
 | [`image-label.properties[]`](https://ngff.openmicroscopy.org/specifications/dev/index.html#labels-metadata) arbitrary keys | MAY | `missingImageLabel:properties` |
 
+
+## Example
+
+A small plate: 2 rows (`A`, `B`) × 2 columns (`1`, `2`), 2 wells populated (`A/1` and `B/2`), 2 fields each, one acquisition. Four images total.
+
+
+```text
+plate.ome.zarr
+├── zarr.json                # collection; `plate`, `bf2raw:layout`,
+│                            # `missingPlate:field_count`
+├── OME
+│   ├── zarr.json            # `ome:omeGroup` node; carries `ome:series` (row 2)
+│   └── METADATA.ome.xml     # found by name inside the node's group (§5.1)
+├── A
+│   ├── zarr.json            
+│   └── 1		             # Well A1
+│       ├── zarr.json        # collection, `well` attribute
+│       ├── 0                # multiscale; `missingMultiscales:type`, `missingMultiscales:metadata`
+│       └── 1
+└── B
+    ├── zarr.json
+    └── 2
+        ├── zarr.json
+        ├── 0
+        └── 1
+```
+
+### Root `zarr.json` — the plate collection
+
+The root node is a collection that contains all of the well collections and the OME group. The well collections each contain all of the multiscale images for a given well. The OME group contains the OME-XML metadata.
+
+```jsonc
+{
+  "zarr_format": 3,
+  "node_type": "group",
+  "attributes": {
+    "ome": {
+      "version": "0.9dev2",
+      "type": "collection",
+      "id": "plate",
+      "name": "AS_09125_050116000001",
+      "attributes": {
+        "plate": {
+          "acquisitions": [
+            {
+              "id": "acq0",
+              "name": "Acquisition Round 1",
+              "missingPlateAcquisitions:maximumfieldcount": 2,
+              "missingPlateAcquisitions:description": "First imaging round",
+              "missingPlateAcquisitions:starttime": 1343749391000,
+              "missingPlateAcquisitions:endtime": 1343749392000
+            }
+          ],
+          "rows": [
+            { "id": "A", "name": "A" },
+            { "id": "B", "name": "B" }
+          ],
+          "columns": [
+            { "id": "col1", "name": "1" },
+            { "id": "col2", "name": "2" }
+          ]
+        },
+        "bf2raw:layout": 3,
+        "missingPlate:field_count": 2
+      },
+      "nodes": [
+        { "type": "ome:omeGroup", "name": "OME", "path": { "type": "zarr", "path": "./OME" } },
+        { "type": "collection", "id": "A1", "name": "A1", "path": { "type": "zarr", "path": "./A/1" } },
+        { "type": "collection", "id": "B2", "name": "B2", "path": { "type": "zarr", "path": "./B/2" } }
+      ]
+    }
+  }
+}
+```
+
+
+### OME group `zarr.json` — `OME/zarr.json`
+
+The OME group is a Node extension. It utilizes the `ome:series` metadata to provide the mapping between the OME-XML entries and the multiscale arrays. The node is in the root node collection.
+
+```jsonc
+{
+  "zarr_format": 3,
+  "node_type": "group",
+  "attributes": {
+    "ome": {
+      "type": "ome:omeGroup",
+      "name": "OME",
+      "attributes": {
+        "ome:series": [
+          "../A/1/0",
+          "../A/1/1",
+          "../B/2/0",
+          "../B/2/1"
+        ]
+      }
+    }
+  }
+}
+```
+
+### Well `zarr.json` — `A/1/zarr.json`
+
+The well (A1 in this case) is a Collection that contains all of the fields of view contained in that well.
+
+```jsonc
+{
+  "zarr_format": 3,
+  "node_type": "group",
+  "attributes": {
+    "ome": {
+      "type": "collection",
+      "id": "A1",
+      "name": "A1",
+      "attributes": {
+        "well": {
+          "row":    { "id": "A",    "path": { "type": "zarr", "path": "../.." } },
+          "column": { "id": "col1", "path": { "type": "zarr", "path": "../.." } }
+        }
+      },
+      "nodes": [
+        {
+          "type": "multiscale",
+          "id": "A1_field0",
+          "name": "Well A01, Field #00",
+          "path": { "type": "zarr", "path": "./0" },
+          "attributes": {
+            "acquisition": { "id": "acq0", "path": { "type": "zarr", "path": "../.." } }
+          }
+        },
+        {
+          "type": "multiscale",
+          "id": "A1_field1",
+          "name": "Well A01, Field #01",
+          "path": { "type": "zarr", "path": "./1" },
+          "attributes": {
+            "acquisition": { "id": "acq0", "path": { "type": "zarr", "path": "../.." } }
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+### Image `zarr.json` — `A/1/0/zarr.json`
+
+Each field of view is a multiscale array.
+
+```jsonc
+{
+  "zarr_format": 3,
+  "node_type": "group",
+  "attributes": {
+    "ome": {
+      "type": "multiscale",
+      "id": "A1_field0",
+      "name": "Well A01, Field #00",
+      "attributes": {
+        "coordinateSystems": [
+          { "id": "physical", "axes": [ "t", "c", "z", "y", "x" ] } # I think axes should be objects
+        ],
+        "omero:omero": {
+          "channels": [ ], # Not filled in
+          "rdefs": { "defaultT": 0, "model": "color", "defaultZ": 0 }
+        },
+        "missingMultiscales:type": "gaussian",
+        "missingMultiscales:metadata": {
+          "method": "loci.common.image.SimpleImageScaler",
+          "version": "Bio-Formats 8.5.0"
+        }
+      },
+      "nodes": [
+        {
+          "type": "singlescale",
+          "id": "A1_field0_s0",
+          "name": "0",
+          "path": { "type": "zarr", "path": "./0" },
+          "attributes": {
+            "coordinateTransformations": [
+              { "type": "scale", "scale": [1, 1, 1, 1, 1],
+                "input": { "id": "A1_field0_s0" }, "output": { "id": "physical" } }
+            ]
+          }
+        },
+        {
+          "type": "singlescale",
+          "id": "A1_field0_s1",
+          "name": "1",
+          "path": { "type": "zarr", "path": "./1" },
+          "attributes": {
+            "coordinateTransformations": [
+              { "type": "scale", "scale": [1, 1, 1, 2, 2],
+                "input": { "id": "A1_field0_s1" }, "output": { "id": "physical" } }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+
 ## Open questions
 1. What is the `bioformats2raw.layout` metadata for and [why must it have the value 3](https://ngff.openmicroscopy.org/specifications/dev/index.html#details)? 
 2. What is the `series` metadata for? Is there some sort iterator downstream?
