@@ -10,6 +10,8 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "napari[all]>=0.8.0",
+    "ngio-collections",
+    "ome-zarr-models>=1.8.0rc2",
     "scikit-image>=0.26.0",
     "zarr>=3.3.0",
 ]
@@ -32,6 +34,9 @@ openjdk = ">=25.0.2,<26"
 [tool.typos.default.extend-words]
 # "ome" is a word here (OME-Zarr, the "ome" metadata key), not a typo of "some".
 ome = "ome"
+
+[tool.uv.sources]
+ngio-collections = { git = "https://github.com/BioVisionCenter/ngio-collections", rev = "23b8fbbcb1453c63611ee683c08c78777fefd25c" }
 
 [dependency-groups]
 dev = [

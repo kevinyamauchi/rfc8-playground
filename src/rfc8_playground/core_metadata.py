@@ -12,7 +12,7 @@ from typing import Any
 
 
 @dataclass(kw_only=True)
-class Path:
+class RFC8Path:
     """The path to a node stored elsewhere.
 
     Attributes
@@ -32,7 +32,7 @@ class Path:
 
 
 @dataclass(kw_only=True)
-class Node:
+class RFC8Node:
     """The base Node type.
 
     This class is also used as the fallback for node types this module does
@@ -69,7 +69,7 @@ class Node:
 
 
 @dataclass(kw_only=True)
-class Singlescale(Node):
+class RFC8Singlescale(RFC8Node):
     """One resolution level of an OME-Zarr multiscale image.
 
     Attributes
@@ -90,17 +90,17 @@ class Singlescale(Node):
         A primary use case for the attributes field is the specialization
         of collections and nodes through additional metadata.
         Required because it MUST contain coordinateTransformations.
-    path : Path or None
+    path : RFC8Path or None
         Where the array for this resolution level is stored.
         Value MUST be a Path object.
     """
 
     type: str = "singlescale"
-    path: Path | None = None
+    path: RFC8Path | None = None
 
 
 @dataclass(kw_only=True)
-class Multiscale(Node):
+class RFC8Multiscale(RFC8Node):
     """An OME-Zarr multiscale image.
 
     RFC-8 requires exactly one of ``nodes`` or ``path``. That
@@ -124,21 +124,21 @@ class Multiscale(Node):
         The metadata for the node.
         A primary use case for the attributes field is the specialization
         of collections and nodes through additional metadata.
-    nodes : list of Singlescale or None
+    nodes : list of RFC8Singlescale or None
         The Node objects for each resolution level.
         If None, this attribute will not be serialized.
-    path : Path or None
+    path : RFC8Path or None
         Path to the multiscale node? I am not 100% sure I am interpreting this correctly.
         If None, this attribute will not be serialized.
     """
 
     type: str = "multiscale"
-    nodes: list[Singlescale] | None = None
-    path: Path | None = None
+    nodes: list[RFC8Singlescale] | None = None
+    path: RFC8Path | None = None
 
 
 @dataclass(kw_only=True)
-class Collection(Node):
+class RFC8Collection(RFC8Node):
     """A grouping of one or more nodes.
 
     Collections may be nested.
@@ -164,25 +164,25 @@ class Collection(Node):
         The metadata for the node.
         A primary use case for the attributes field is the specialization
         of collections and nodes through additional metadata.
-    nodes : list of Node or None
+    nodes : list of RFC8Node or None
         The Node objects belonging to this collection.
-    path : Path or None
+    path : RFC8Path or None
         Where the collection metadata is stored, when it is not inlined.
     """
 
     type: str = "collection"
-    nodes: list[Node] | None = None
-    path: Path | None = None
+    nodes: list[RFC8Node] | None = None
+    path: RFC8Path | None = None
 
 
-NODE_CLASSES: dict[str, type[Node]] = {
-    "collection": Collection,
-    "multiscale": Multiscale,
-    "singlescale": Singlescale,
+NODE_CLASSES: dict[str, type[RFC8Node]] = {
+    "collection": RFC8Collection,
+    "multiscale": RFC8Multiscale,
+    "singlescale": RFC8Singlescale,
 }
 
 
-def load_node(data: dict[str, Any]) -> Node:
+def load_node(data: dict[str, Any]) -> RFC8Node:
     """Build a node from its JSON representation.
 
     Fields that the node class does not model are dropped with a warning.
@@ -196,7 +196,7 @@ def load_node(data: dict[str, Any]) -> Node:
 
     Returns
     -------
-    Node
+    RFC8Node
         The node dataclass.
     """
     try:
@@ -204,7 +204,7 @@ def load_node(data: dict[str, Any]) -> Node:
     except KeyError:
         raise ValueError("node metadata is missing the required 'type' field") from None
 
-    node_class = NODE_CLASSES.get(node_type, Node)
+    node_class = NODE_CLASSES.get(node_type, RFC8Node)
 
     field_names = {f.name for f in fields(node_class)}
     kwargs = {key: value for key, value in data.items() if key in field_names}
@@ -219,7 +219,7 @@ def load_node(data: dict[str, Any]) -> Node:
 
     path = kwargs.get("path")
     if isinstance(path, dict):
-        kwargs["path"] = Path(**path)
+        kwargs["path"] = RFC8Path(**path)
 
     child_nodes = kwargs.get("nodes")
     if isinstance(child_nodes, list):
@@ -228,14 +228,14 @@ def load_node(data: dict[str, Any]) -> Node:
     return node_class(**kwargs)
 
 
-def dump_node(node: Node) -> dict[str, Any]:
+def dump_node(node: RFC8Node) -> dict[str, Any]:
     """Convert a node to its JSON representation.
 
     Fields that are ``None`` are omitted.
 
     Parameters
     ----------
-    node : Node
+    node : RFC8Node
         The node to serialize.
 
     Returns
@@ -249,7 +249,7 @@ def dump_node(node: Node) -> dict[str, Any]:
         if value is None:
             continue
 
-        if isinstance(value, Path):
+        if isinstance(value, RFC8Path):
             value = {f.name: getattr(value, f.name) for f in fields(value)}
         elif node_field.name == "nodes":
             value = [dump_node(child) for child in value]
@@ -259,7 +259,7 @@ def dump_node(node: Node) -> dict[str, Any]:
     return data
 
 
-def load_ome(container: dict[str, Any]) -> Node:
+def load_ome(container: dict[str, Any]) -> RFC8Node:
     """Build the root node from the object that holds the ome key.
 
     For a standalone JSON document that object is the root of the file.
@@ -275,7 +275,7 @@ def load_ome(container: dict[str, Any]) -> Node:
 
     Returns
     -------
-    Node
+    RFC8Node
         The root node.
     """
     try:
@@ -286,12 +286,12 @@ def load_ome(container: dict[str, Any]) -> Node:
     return load_node(ome)
 
 
-def dump_ome(node: Node) -> dict[str, Any]:
+def dump_ome(node: RFC8Node) -> dict[str, Any]:
     """Make a JSON dictionary with metadata in the ome key.
 
     Parameters
     ----------
-    node : Node
+    node : RFC8Node
         The root node to serialize.
 
     Returns
@@ -310,7 +310,7 @@ def _ome_container(data: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
-def read_document(path: str | os.PathLike[str]) -> Node:
+def read_document(path: str | os.PathLike[str]) -> RFC8Node:
     """Read from the root OME node of a JSON file.
 
     Accepted layouts: a standalone JSON file, where the
@@ -324,7 +324,7 @@ def read_document(path: str | os.PathLike[str]) -> Node:
 
     Returns
     -------
-    Node
+    RFC8Node
         The root node.
     """
     with open(path) as f:
@@ -334,7 +334,7 @@ def read_document(path: str | os.PathLike[str]) -> Node:
 
 
 def write_document(
-    node: Node,
+    node: RFC8Node,
     path: str | os.PathLike[str],
     container: str = "json",
 ) -> None:
@@ -349,7 +349,7 @@ def write_document(
 
     Parameters
     ----------
-    node : Node
+    node : RFC8Node
         The root node to write.
     path : str or os.PathLike
         The file to write. With ``container="zarr"`` this is the path to the
