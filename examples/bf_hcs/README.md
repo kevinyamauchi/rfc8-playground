@@ -335,4 +335,15 @@ We are using the “Single file OME-tiff” dataset from the [OME-tiff Plate sam
    ```bash
    pixi run ./bioformats2raw-0.12.1/bin/bioformats2raw  NIRHTa\+001.ome.tiff NIRHTa\+001.ome.zarr --ngff-version 0.5
    ```
+   
 
+### Convert the ome-zarr v0.5 to RFC-8
+
+1. Change directory to the example directory
+	```bash
+    cd examples/bf2raw_hcs
+	```
+2. Run the conversion script. Note that if you've run the script before, you have to run with the --force flag to overwrite the output directory.
+    ```bash
+    uv run hcs_rfc8_conversion.py
+    ```
