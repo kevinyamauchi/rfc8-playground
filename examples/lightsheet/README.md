@@ -110,6 +110,8 @@ A second alternative would be to group the derived results from their source ima
                         └── 6: { type: "ngio:table", id: "<uuid>", name: "timestamps", … }            # deconv.ome.zarr/tables/timestamps
 ```
 
+Note that switching between the two representations is a matter of changing the `Collection` structure. We do not have to move the array data around or change the `Multiscale` nodes. Neat!
+
 ### Images
 
 The `images` `Collection` will contain one `Multiscale` image node for each of the four images (raw, deconvolved, raw MIP, and deconvolved MIP).
