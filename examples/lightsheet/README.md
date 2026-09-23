@@ -114,11 +114,11 @@ Note that switching between the two representations is a matter of changing the 
 
 ### Images
 
-The `images` `Collection` will contain one `Multiscale` image node for each of the four images (raw, deconvolved, raw MIP, and deconvolved MIP).
+The images will be represented as `Multiscale` nodes. In the example above they are shown as inlined for clarity, but they also could be stored in the zarr group with the array data. 
 
 ### Labels
 
-The `labels` `Collection` will contain one `Multiscale` label node for each of the three segmentations. All of the labels were derived from the deconvolved image, so we can use the `source` attribute to reference the `deconv.ome.zarr` image node. 
+The `labels` will be represented as `Multiscale` nodes with the `label` attribute. All of the labels were derived from the deconvolved image, so we can use the `source` attribute to reference the `deconv.ome.zarr` image node. 
 
 ### GEFF extension
 
